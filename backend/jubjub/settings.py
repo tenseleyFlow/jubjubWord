@@ -136,9 +136,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Next.js default port
 ]
 
-# Add production frontend URL if provided
+# Add production frontend URL(s) if provided - supports comma-separated values
 if os.environ.get('FRONTEND_URL'):
-    CORS_ALLOWED_ORIGINS.append(os.environ.get('FRONTEND_URL'))
+    frontend_urls = os.environ.get('FRONTEND_URL').split(',')
+    for url in frontend_urls:
+        CORS_ALLOWED_ORIGINS.append(url.strip())
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
