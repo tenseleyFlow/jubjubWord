@@ -85,6 +85,7 @@ export default function Home() {
             <h1 className="text-4xl font-bold mb-2">
               JubJubWord
             </h1>
+            <p className='text-gray-500'>for Jules</p>
             <h2 className="text-2xl font-bold mb-2">
               Powered by the JubJub Bird
             </h2>
