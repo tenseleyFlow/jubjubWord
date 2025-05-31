@@ -16,7 +16,10 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   
   // Form state
-  const [count, setCount] = useState(1);
+  // satisfy the gd linter. I guess it was cruffed,
+  // but vercel getting pissy over an unused var? bold move. 
+  const count = 1;
+  // const [count, setCount] = useState(1);
   const [length, setLength] = useState(8);
   const [minLength, setMinLength] = useState(3);
   const [seed, setSeed] = useState('');
