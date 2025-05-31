@@ -1,6 +1,6 @@
 # JubJubWord
 ### Powered by the [JubJub Bird](https://www.poetryfoundation.org/poems/42916/jabberwocky)
-<img src="frontend/src/assets/puffin_color.png" width="100">
+<img src="frontend/src/assets/puffin_color.png" width="200">
 
 this web app has one purpose[^1]: generate plausibly deniable gibberish à la [Ed Bassmaster](https://www.youtube.com/watch?v=t18Fpbi1MI0)
 
