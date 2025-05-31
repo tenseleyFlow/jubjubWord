@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ode to a pallette */
+:root {
+  --color-bg:       #F7F1E8;  /* creamy... */
+  --color-text:     #2D2D2D;  /* ...charcoal, */
+  --color-head:     #3A2449;  /* tastes like deep plum. */
+  --color-sub:      #C081A8;  /* a dusty rose... */
+  --color-accent:   #D4AF37;  /* tumbles on warm ochre. */
+  --color-border:   #A99FAF;  /* lavender-gray... okay this one is normal */
+}
+
+h1 {
+  color: var(--color-head);
+}
+
+h2 {
+  color: var(--color-sub);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* TODO: dark mode support */
+  }
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* base floating animation */
+@keyframes floatUpDown {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* alarm clock ringing animation - rotational shake */
+@keyframes alarmRing {
+  0%   { transform: rotate(0deg); }
+  10%  { transform: rotate(-8deg); }
+  20%  { transform: rotate(8deg); }
+  30%  { transform: rotate(-6deg); }
+  40%  { transform: rotate(6deg); }
+  50%  { transform: rotate(-4deg); }
+  60%  { transform: rotate(4deg); }
+  70%  { transform: rotate(-3deg); }
+  80%  { transform: rotate(3deg); }
+  90%  { transform: rotate(-1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* wobble-swell for click action */
+@keyframes shakeBounce {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+  10%  { transform: translate(-10px, -15px) scale(1.05) rotate(-5deg); }
+  20%  { transform: translate(10px, -25px) scale(1.1) rotate(5deg); }
+  30%  { transform: translate(-8px, -20px) scale(1.08) rotate(-4deg); }
+  40%  { transform: translate(8px, -30px) scale(1.12) rotate(4deg); }
+  50%  { transform: translate(-6px, -25px) scale(1.1) rotate(-3deg); }
+  60%  { transform: translate(6px, -15px) scale(1.05) rotate(3deg); }
+  70%  { transform: translate(-4px, -10px) scale(1.02) rotate(-2deg); }
+  80%  { transform: translate(4px, -5px) scale(1.01) rotate(2deg); }
+  90%  { transform: translate(-2px, -2px) scale(1) rotate(-1deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+}
+
+/* glow effect */
+@keyframes glow {
+  0%   { filter: drop-shadow(0 0 0 rgba(255, 215, 0, 0)); }
+  50%  { filter: drop-shadow(0 0 32px rgba(198, 177, 23, 1)); }
+  100% { filter: drop-shadow(0 0 0 rgba(255, 215, 0, 0)); }
+}
+
+@keyframes glowAccent {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 12px rgba(236, 193, 51, 1))
+      drop-shadow(0 0 30px rgba(236, 193, 51, 0.7))
+      drop-shadow(0 0 40px rgba(236, 193, 51, 0.4));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  }
+}
+
+/* FLOATING CONTAINER - handles continuous up/down motion */
+.bird-float {
+  animation: floatUpDown 4s ease-in-out infinite;
+}
+
+/* SHAKE CONTAINER - handles rotation and click effects */
+.bird-shake {
+  transform-origin: center center;
+  transition: transform 0.1s ease;
+}
+
+/* hover state - alarm clock ringing (only affects rotation) */
+.bird-shake:hover {
+  animation: alarmRing 0.5s ease-in-out infinite;
+}
+
+/* click animation - overrides hover */
+.bird-shake.shake {
+  animation: 
+    shakeBounce 0.8s ease-in-out,
+    glowAccent 0.8s ease-in-out;
+}
+
+/* Loading state - affect the floating container */
+.bird-float.loading {
+  opacity: 0.7;
+  animation: floatUpDown 2s ease-in-out infinite;
+}
+
+/* base SVG styling */
+.bird-icon {
+  width: 172px;
+  height: 172px;
+  color: #3A2449;
+  fill: #3A2449;
+  cursor: pointer;
+  display: block;
+}
+
+/* fade in/out animation for the "copied!" notif */
+@keyframes fade-in-out {
+  0% { opacity: 0; transform: translateY(10px) translateX(-50%); }
+  20% { opacity: 1; transform: translateY(0) translateX(-50%); }
+  80% { opacity: 1; transform: translateY(0) translateX(-50%); }
+  100% { opacity: 0; transform: translateY(-10px) translateX(-50%); }
+}
+
+.animate-fade-in-out {
+  animation: fade-in-out 2s ease-in-out;
+}
+
+/* make gennied word look clickable */
+.cursor-pointer.select-none:hover {
+  text-shadow: 0 0 10px rgba(236, 72, 153, 0.3);
+}
+
+
+.bg-rose-to-cream {
+  background: linear-gradient(
+    136deg,
+    var(--color-sub) 0%,
+    var(--color-bg) 60%
+  );
+}
