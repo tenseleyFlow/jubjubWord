@@ -26,6 +26,7 @@ export default function Home() {
   const [temperature, setTemperature] = useState(1.0);
   const [markovOrder, setMarkovOrder] = useState(2);
   const [useWordBoundaries, setUseWordBoundaries] = useState(true);
+  const [syllableAwareness, setSyllableAwareness] = useState(0.0);
 
   const handleGenerate = async () => {
     // block multiple clicks during loading
@@ -51,6 +52,7 @@ export default function Home() {
         temperature,
         n: markovOrder,
         use_word_boundaries: useWordBoundaries,
+        syllable_awareness: syllableAwareness,
         ...(seed && { seed }),
       };
       
@@ -96,7 +98,7 @@ export default function Home() {
 
           <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
             {/* Basic Controls - with descriptive text */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Max Length
@@ -130,6 +132,32 @@ export default function Home() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Syllable Awareness
+                  <span className="block text-xs text-gray-500">0 = random, 1 = pronounceable</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={syllableAwareness}
+                    onChange={(e) => setSyllableAwareness(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #f472b6 0%, #f472b6 ${syllableAwareness * 100}%, #e5e7eb ${syllableAwareness * 100}%, #e5e7eb 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>random</span>
+                    <span className="font-medium">{syllableAwareness.toFixed(1)}</span>
+                    <span>natural</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Seed (optional)
                   <span className="block text-xs text-gray-500">starting characters</span>
                 </label>
@@ -157,7 +185,7 @@ export default function Home() {
             {/* Advanced controls - collapsible */}
             {showAdvanced && (
               <div className="border-t pt-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Min Length
