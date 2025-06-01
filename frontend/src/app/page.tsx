@@ -119,15 +119,25 @@ export default function Home() {
                   Temperature
                   <span className="block text-xs text-gray-500">higher = more random</span>
                 </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  max="3.0"
-                  step="0.1"
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value) || 1.0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-400"
-                />
+                <div className="relative">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="3.0"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #f472b6 0%, #f472b6 ${((temperature - 0.1) / (3.0 - 0.1)) * 100}%, #e5e7eb ${((temperature - 0.1) / (3.0 - 0.1)) * 100}%, #e5e7eb 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>conservative</span>
+                    <span className="font-medium">{temperature.toFixed(1)}</span>
+                    <span>creative</span>
+                  </div>
+                </div>
               </div>
 
               <div>
