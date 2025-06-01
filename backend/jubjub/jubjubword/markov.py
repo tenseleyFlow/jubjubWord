@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 class Marklove:
     """
-    Markov Chain plausible nonsense word generator, now, nOW, NOW! with 
-    improved seed handling and performance.
+    Markov Chain plausible nonsense word generator, now, nOW, NOW! with
+    improved seed handling, performance, and syllable awareness.
     """
 
     def __init__(self, n: int = 2, use_word_boundaries: bool = True):
@@ -34,6 +34,14 @@ class Marklove:
         # Boundary markers
         self.start_marker = "^"
         self.end_marker = "$"
+
+        # syllable awareness
+        self.vowels = set('aeiouAEIOU')
+        self.forbidden_clusters = {
+            'bbb', 'ccc', 'ddd', 'fff', 'ggg',
+            'hhh', 'kkk', 'lll', 'mmm', 'nnn', 'ppp', 'rrr', 'sss',
+            'ttt', 'vvv', 'www', 'yyy', 'zzz'
+        }
 
     def train(self, lines: List[str]) -> None:
         """
@@ -86,8 +94,9 @@ class Marklove:
                 if state not in self.start_states:
                     self.start_states.append(state)
 
-    def genny(self, max_length: int = 10, min_length: int = 3, 
-              seed: Optional[str] = None, temperature: float = 1.0) -> str:
+    def genny(self, max_length: int = 10, min_length: int = 3,
+              seed: Optional[str] = None, temperature: float = 1.0,
+              syllable_awareness: float = 0.0) -> str:
         """
         Generate a nonsense word using the trained Markov Chain.
 
@@ -96,6 +105,7 @@ class Marklove:
             min_length: minimum length of generated word
             seed: optional seed to influence generation
             temperature: Randomness control (higher = more random)
+            syllable_awareness: Syllable bias strength (0.0 = off, 1.0 = full)
 
         Returns:
             plausibly deniable nonsense word
@@ -121,7 +131,12 @@ class Marklove:
             if not possible_chars:
                 break
 
-            next_char = self._weighted_choice(possible_chars, temperature)
+            # Choose with or without syllable awareness
+            if syllable_awareness > 0:
+                current_word = "".join(output).replace(self.start_marker, "").replace(self.end_marker, "")
+                next_char = self._syllable_aware_choice(possible_chars, temperature, current_word, syllable_awareness)
+            else:
+                next_char = self._weighted_choice(possible_chars, temperature)
 
             # Check for end marker
             if self.use_word_boundaries and next_char == self.end_marker:
@@ -131,7 +146,11 @@ class Marklove:
                 possible_chars = [c for c in possible_chars if c != self.end_marker]
                 if not possible_chars:
                     break
-                next_char = self._weighted_choice(possible_chars, temperature)
+                if syllable_awareness > 0:
+                    current_word = "".join(output).replace(self.start_marker, "").replace(self.end_marker, "")
+                    next_char = self._syllable_aware_choice(possible_chars, temperature, current_word, syllable_awareness)
+                else:
+                    next_char = self._weighted_choice(possible_chars, temperature)
 
             output.append(next_char)
             current_state = current_state[1:] + next_char
@@ -142,6 +161,112 @@ class Marklove:
             result = result.replace(self.start_marker, "").replace(self.end_marker, "")
 
         return result
+
+    def _get_syllable_context(self, current_word: str) -> Dict[str, any]:
+        """Analyze current syllable state of the word being generated."""
+        if not current_word:
+            return {
+                'consecutive_consonants': 0, 
+                'consecutive_vowels': 0,
+                'last_char_type': None,
+                'word_length': 0
+            }
+
+        consecutive_consonants = 0
+        consecutive_vowels = 0
+
+        # count consecutive sounds at word end
+        for char in reversed(current_word):
+            if char in self.vowels:
+                if consecutive_consonants > 0:
+                    break
+                consecutive_vowels += 1
+            else:
+                if consecutive_vowels > 0:
+                    break
+                consecutive_consonants += 1
+
+        return {
+            'consecutive_consonants': consecutive_consonants,
+            'consecutive_vowels': consecutive_vowels,
+            'last_char_type': 'vowel' if current_word[-1] in self.vowels else 'consonant',
+            'word_length': len(current_word)
+        }
+
+    def _calculate_syllable_bias(self, char: str, syllable_context: Dict, 
+                                current_word: str, strength: float) -> float:
+        """Calculate bias multiplier for character choice based on syllable rules."""
+        is_vowel = char.lower() in self.vowels
+        consecutive_consonants = syllable_context['consecutive_consonants']
+        consecutive_vowels = syllable_context['consecutive_vowels']
+        word_length = syllable_context['word_length']
+
+        bias = 1.0
+
+        # strong preference for vowel after many consonants
+        if is_vowel and consecutive_consonants >= 3:
+            bias *= 4.0
+        elif is_vowel and consecutive_consonants >= 2:
+            bias *= 2.0
+
+        # strong preference for consonant after many vowels  
+        if not is_vowel and consecutive_vowels >= 2:
+            bias *= 3.0
+
+        # mild discouragement of extending same type runs
+        if is_vowel and consecutive_vowels >= 1:
+            bias *= 0.5
+        if not is_vowel and consecutive_consonants >= 2:
+            bias *= 0.6
+
+        # forbidden cluster check
+        if self._creates_forbidden_cluster(current_word, char):
+            bias *= 0.1  # Strongly discourage but don't eliminate
+
+        # Ensure we have some vowels in longer words
+        if word_length >= 4 and not any(c in self.vowels for c in current_word) and is_vowel:
+            bias *= 5.0
+
+        # apply strength multiplier (1.0 = full effect, 0.0 = no effect)
+        return 1.0 + (bias - 1.0) * strength
+
+    def _creates_forbidden_cluster(self, current_word: str, next_char: str) -> bool:
+        """Check if adding next_char would create a forbidden letter cluster."""
+        if len(current_word) < 2:
+            return False
+
+        # check last 2 chars + next char for forbidden patterns
+        test_segment = (current_word[-2:] + next_char).lower()
+
+        return any(cluster in test_segment for cluster in self.forbidden_clusters)
+
+    def _syllable_aware_choice(self, chars: List[str], temperature: float, 
+                              current_word: str, syllable_strength: float) -> str:
+        """Choose character with syllable awareness and bias."""
+        if not chars:
+            # Emergency vowel if stuck
+            return random.choice(['a', 'e', 'i', 'o', 'u'])
+
+        syllable_context = self._get_syllable_context(current_word)
+
+        # Calculate base frequencies
+        char_freq = Counter(chars)
+
+        # Apply syllable biases
+        adjusted_weights = []
+        chars_list = list(char_freq.keys())
+
+        for char in chars_list:
+            base_weight = char_freq[char] ** (1 / temperature)
+            syllable_bias = self._calculate_syllable_bias(char, syllable_context, 
+                                                        current_word, syllable_strength)
+            adjusted_weights.append(base_weight * syllable_bias)
+
+        # ensure we have at least some weight
+        if all(w <= 0 for w in adjusted_weights):
+            adjusted_weights = [1.0] * len(adjusted_weights)
+
+        return random.choices(chars_list, weights=adjusted_weights)[0]
 
     def _get_initial_state(self, seed: Optional[str]) -> Optional[str]:
         """
@@ -184,7 +309,6 @@ class Marklove:
         if self.start_states:
             return random.choice(self.start_states)
         return random.choice(list(self.transitions.keys()))
-
 
     def _find_matching_states(self, seed: str) -> List[str]:
         """
