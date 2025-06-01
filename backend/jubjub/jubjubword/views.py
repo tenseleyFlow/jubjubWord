@@ -1,4 +1,11 @@
 from django.shortcuts import render
+from django.http import FileResponse, Http404
+from django.conf import settings
+import os
+import subprocess
+import hashlib
+import tempfile
+from pathlib import Path
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -20,12 +27,7 @@ def generate_words(request):
         use_word_boundaries = request.data.get('use_word_boundaries', True)
         syllable_awareness = request.data.get('syllable_awareness', 0.0)
 
-        # Validate parameters:
-        #       - Limit to 50 words
-        #       - Limit length
-        #       - Add this
-        #       - Limit temperature to reasonable range
-        #       - Clamp syllable awareness
+        # Validate parameters
         count = max(1, min(int(count), 50))
         length = max(3, min(int(length), 20))
         min_length = max(1, min(int(min_length), length))
@@ -66,6 +68,68 @@ def generate_words(request):
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+def generate_audio(request):
+    """Generate audio pronunciation for a word using espeak-ng"""
+    try:
+        word = request.data.get('word', '').strip()
+        if not word:
+            return Response({'error': 'No word provided'}, status=400)
+
+        # sanitize word just in case
+        import re
+        if not re.match(r'^[a-zA-Z\-\'\.]+$', word):
+            return Response({'error': 'Invalid characters in word'}, status=400)
+
+        # create hash for filename (cache audio files)
+        word_hash = hashlib.md5(word.lower().encode()).hexdigest()[:8]
+        filename = f"word_{word_hash}.wav"
+
+        # Ensure media directory exists
+        media_dir = Path(settings.MEDIA_ROOT)
+        audio_dir = media_dir / 'audio'
+        audio_dir.mkdir(parents=True, exist_ok=True)
+
+        audio_path = audio_dir / filename
+
+        # Check if audio file already exists (cache hit)
+        if not audio_path.exists():
+            # genny audio using espeak-ng
+            try:
+                subprocess.run([
+                    'espeak-ng',
+                    '-w', str(audio_path),  # write to WAV file
+                    '-s', '130',            # Speed (words per minute)
+                    '-a', '200',            # amplitude (volume)
+                    '-g', '5',              # gap between words
+                    word
+                ], check=True, capture_output=True, text=True)
+
+            except subprocess.CalledProcessError as e:
+                return Response({
+                    'error': f'Failed to generate audio: {e.stderr}'
+                }, status=500)
+            except FileNotFoundError:
+                return Response({
+                    'error': 'espeak-ng not found. Audio generation unavailable.'
+                }, status=503)
+
+        # Return URL to the audio file
+        audio_url = f"/media/audio/{filename}"
+
+        return Response({
+            'word': word,
+            'audio_url': audio_url,
+            'cached': audio_path.exists()
+        })
+
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
