@@ -6,6 +6,7 @@ export interface GenerateWordsRequest {
   temperature?: number;
   n?: number;
   use_word_boundaries?: boolean;
+  syllable_awareness?: number;
 }
 
 export interface GenerateWordsResponse {
@@ -18,5 +19,6 @@ export interface GenerateWordsResponse {
     temperature: number;
     n: number;
     use_word_boundaries: boolean;
+    syllable_awareness: number;
   };
 }
