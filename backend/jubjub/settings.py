@@ -125,7 +125,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Add this for production
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Media files (user-generated content)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -147,3 +151,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ]
 }
+
+# Audio settings
+AUDIO_CACHE_TIMEOUT = 3600  # 1 hour cache for audio files
+MAX_AUDIO_FILES = 1000      # Cleanup old files when limit reached
