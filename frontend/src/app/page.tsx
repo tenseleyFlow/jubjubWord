@@ -87,7 +87,7 @@ export default function Home() {
             </h1>
             <p className='text-gray-500'>for Jules</p>
             <h2 className="text-2xl font-bold mb-2">
-              Powered by the JubJub Bird
+              Powered by the <a href="https://www.poetryfoundation.org/poems/42916/jabberwocky" className="no-underline text-inherit">JubJub Bird</a>
             </h2>
             <p className="text-gray-600">
               Generate nonsense words <a href="https://www.youtube.com/watch?v=t18Fpbi1MI0" className="text-pink-600 hover:text-pink-800 underline">à la Ed BassMaster</a> using Markov chains
@@ -277,6 +277,9 @@ export default function Home() {
             </a>
             <a href="https://raw.githubusercontent.com/tenseleyFlow/jubjubWord/refs/heads/trunk/backend/jubjub/jubjubword/corpus.txt" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-pink-600 transition-colors text-sm">
               corpus
+            </a>
+            <a href="https://www.poetryfoundation.org/poems/42916/jabberwocky" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-pink-600 transition-colors text-sm">
+              jabberwocky
             </a>
             <a href="https://www.musicsian.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-pink-600 transition-colors text-sm">
               matt
