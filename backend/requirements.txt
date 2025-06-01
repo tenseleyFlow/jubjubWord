@@ -5,3 +5,5 @@ djangorestframework==3.16.0
 sqlparse==0.5.3
 whitenoise==6.6.0
 gunicorn==21.2.0
+phonemizer==3.2.1
+pydub==0.25.1
