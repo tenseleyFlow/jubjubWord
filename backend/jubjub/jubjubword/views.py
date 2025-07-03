@@ -10,12 +10,15 @@ import tempfile
 from pathlib import Path
 import random
 import uuid
+import logging
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .markov import get_markov_instance
 from .models import JubJubWord, WordDefinition, WordInteraction
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_session_id(request):
@@ -56,7 +59,12 @@ def generate_words(request):
         syllable_awareness = max(0.0, min(float(syllable_awareness), 1.0))
 
         # 35/65 chance to show community word vs generate new
-        use_community = random.random() < 0.35
+        use_community = random.random() < 0.35  # Changed from 0.2 to 0.35
+        
+        # Debug logging
+        if use_community:
+            total_community_words = JubJubWord.objects.filter(copy_count__gt=0).count()
+            logger.info(f"Attempting community word selection. Total available: {total_community_words}")
         
         # Max attempts to avoid infinite loops
         max_generation_attempts = 20
@@ -67,7 +75,10 @@ def generate_words(request):
             
             if use_community and not seed:  # Don't use community words if user provided seed
                 # Try to get a popular community word, excluding the last shown word
-                query = JubJubWord.objects.filter(copy_count__gt=0)
+                # Include words with definitions OR copies
+                query = JubJubWord.objects.filter(
+                    Q(copy_count__gt=0) | Q(definition_count__gt=0)
+                )
                 if last_word:
                     query = query.exclude(word=last_word)
                 
@@ -207,6 +218,8 @@ def track_copy(request):
         session_id = get_or_create_session_id(request)
         word_text = request.data.get('word', '').strip()
         
+        logger.info(f"Track copy called for word: {word_text}")
+        
         if not word_text:
             return Response({'error': 'No word provided'}, status=400)
         
@@ -216,6 +229,10 @@ def track_copy(request):
         # Increment copy count
         word.copy_count = F('copy_count') + 1
         word.save(update_fields=['copy_count'])
+        
+        # Refresh to get actual count
+        word.refresh_from_db()
+        logger.info(f"Word '{word_text}' now has {word.copy_count} copies")
         
         # Track interaction
         WordInteraction.objects.create(
@@ -230,6 +247,7 @@ def track_copy(request):
         })
     
     except Exception as e:
+        logger.error(f"Error tracking copy: {str(e)}")
         return Response({'error': str(e)}, status=500)
 
 
