@@ -55,8 +55,8 @@ def generate_words(request):
         n = max(1, min(int(n), 4))
         syllable_awareness = max(0.0, min(float(syllable_awareness), 1.0))
 
-        # 20/80 chance to show community word vs generate new
-        use_community = random.random() < 0.2  # Changed from 0.5 to 0.2
+        # 35/65 chance to show community word vs generate new
+        use_community = random.random() < 0.35
         
         # Max attempts to avoid infinite loops
         max_generation_attempts = 20
