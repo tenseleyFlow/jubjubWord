@@ -34,6 +34,9 @@ def generate_words(request):
     try:
         session_id = get_or_create_session_id(request)
         
+        # Get the last shown word from session
+        last_word = request.session.get('last_word', None)
+        
         # grab parameters from request
         count = request.data.get('count', 1)
         length = request.data.get('length', 8)
@@ -56,10 +59,12 @@ def generate_words(request):
         use_community = random.random() < 0.5
         
         if use_community and not seed:  # Don't use community words if user provided seed
-            # Try to get a popular community word
-            community_word = JubJubWord.objects.filter(
-                copy_count__gt=0
-            ).order_by('-copy_count', '-definition_count', '?').first()
+            # Try to get a popular community word, excluding the last shown word
+            query = JubJubWord.objects.filter(copy_count__gt=0)
+            if last_word:
+                query = query.exclude(word=last_word)
+            
+            community_word = query.order_by('-copy_count', '-definition_count', '?').first()
             
             if community_word:
                 # Track that we showed this word
@@ -72,6 +77,9 @@ def generate_words(request):
                 # Update last shown time
                 community_word.last_shown = timezone.now()
                 community_word.save(update_fields=['last_shown'])
+                
+                # Store this word as the last shown
+                request.session['last_word'] = community_word.word
                 
                 # Get definitions
                 definitions = community_word.definitions.all()[:5]  # Top 5 definitions
@@ -106,7 +114,12 @@ def generate_words(request):
         markov = get_markov_instance(n=n, use_word_boundaries=use_word_boundaries)
 
         words = []
-        for _ in range(count):
+        attempts = 0
+        max_attempts = 10
+        
+        while len(words) < count and attempts < max_attempts:
+            attempts += 1
+            
             word = markov.genny(
                 max_length=length, 
                 min_length=min_length,
@@ -114,6 +127,11 @@ def generate_words(request):
                 temperature=temperature,
                 syllable_awareness=syllable_awareness
             )
+            
+            # Skip if it's the same as the last word
+            if word == last_word and attempts < max_attempts:
+                continue
+                
             words.append(word)
             
             # Store the generated word
@@ -132,6 +150,9 @@ def generate_words(request):
                 session_id=session_id,
                 interaction_type='generate'
             )
+            
+            # Store this word as the last shown
+            request.session['last_word'] = word
 
         return Response({
             'words': words,
