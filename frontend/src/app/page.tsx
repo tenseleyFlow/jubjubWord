@@ -153,7 +153,7 @@ const DefinitionModal = ({
           <textarea
             value={definition}
             onChange={(e) => setDefinition(e.target.value)}
-            placeholder="Enter your creative definition..."
+            placeholder="define this word, man"
             className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
             rows={4}
             maxLength={500}
