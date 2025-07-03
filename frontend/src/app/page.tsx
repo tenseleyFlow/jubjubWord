@@ -1,10 +1,123 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { wordGeneratorApi } from '@/services/api';
 import { GenerateWordsRequest } from '@/types';
 
 import BirdIcon from '@/assets/puffin.svg';
+
+// Simple syllable detection based on vowel patterns
+function getSyllableBreaks(word: string): string {
+  const vowels = 'aeiouAEIOU';
+  const syllables: string[] = [];
+  let currentSyllable = '';
+  let previousWasVowel = false;
+  
+  for (let i = 0; i < word.length; i++) {
+    const char = word[i];
+    const isVowel = vowels.includes(char);
+    const nextChar = word[i + 1];
+    const isNextVowel = nextChar && vowels.includes(nextChar);
+    
+    currentSyllable += char;
+    
+    // Break syllable after vowel followed by consonant (unless at end)
+    if (isVowel && !isNextVowel && i < word.length - 1) {
+      // Look ahead for consonant clusters
+      let consonantCount = 0;
+      for (let j = i + 1; j < word.length && !vowels.includes(word[j]); j++) {
+        consonantCount++;
+      }
+      
+      // If multiple consonants, keep first with current syllable
+      if (consonantCount > 1 && i < word.length - 2) {
+        currentSyllable += word[i + 1];
+        i++;
+      }
+      
+      syllables.push(currentSyllable);
+      currentSyllable = '';
+      previousWasVowel = false;
+    } else if (i === word.length - 1) {
+      // Add remaining
+      syllables.push(currentSyllable);
+    }
+    
+    previousWasVowel = isVowel;
+  }
+  
+  // Handle any remaining characters
+  if (currentSyllable) {
+    if (syllables.length > 0 && currentSyllable.length === 1 && !vowels.includes(currentSyllable)) {
+      // Attach single consonant to previous syllable
+      syllables[syllables.length - 1] += currentSyllable;
+    } else {
+      syllables.push(currentSyllable);
+    }
+  }
+  
+  return syllables.join('·');
+}
+
+// Speech synthesis hook
+function useSpeechSynthesis() {
+  const [speaking, setSpeaking] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      synthRef.current = window.speechSynthesis;
+    } else {
+      setSupported(false);
+    }
+  }, []);
+  
+  const speak = (text: string) => {
+    if (!synthRef.current || !supported) return;
+    
+    // Cancel any ongoing speech
+    synthRef.current.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9; // Slightly slower for nonsense words
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    
+    synthRef.current.speak(utterance);
+  };
+  
+  const stop = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setSpeaking(false);
+    }
+  };
+  
+  return { speak, stop, speaking, supported };
+}
+
+// Speaker Icon Component
+const SpeakerIcon = ({ speaking }: { speaking: boolean }) => {
+  if (speaking) {
+    return (
+      <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    );
+  }
+  
+  return (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+    </svg>
+  );
+};
 
 export default function Home() {
   const [words, setWords] = useState<string[]>([]);
@@ -15,11 +128,11 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   
+  // Speech synthesis
+  const { speak, stop, speaking, supported: speechSupported } = useSpeechSynthesis();
+  
   // Form state
-  // satisfy the gd linter. I guess it was cruffed,
-  // but vercel getting pissy over an unused var? bold move. 
   const count = 1;
-  // const [count, setCount] = useState(1);
   const [length, setLength] = useState(8);
   const [minLength, setMinLength] = useState(3);
   const [seed, setSeed] = useState('');
@@ -31,6 +144,9 @@ export default function Home() {
   const handleGenerate = async () => {
     // block multiple clicks during loading
     if (loading) return;
+    
+    // Stop any ongoing speech
+    stop();
     
     // mark bird clicked
     setHasClickedBird(true);
@@ -76,6 +192,12 @@ export default function Home() {
       } catch (err) {
         console.error('Failed to copy text: ', err);
       }
+    }
+  };
+
+  const handleSpeak = () => {
+    if (words.length > 0 && speechSupported) {
+      speak(words[0]);
     }
   };
 
@@ -299,6 +421,24 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              
+              {/* Syllable breaks */}
+              <div className="text-lg text-gray-600 mt-2">
+                {getSyllableBreaks(words[0])}
+              </div>
+              
+              {/* Pronunciation button */}
+              {speechSupported && (
+                <button
+                  onClick={handleSpeak}
+                  className="mt-4 p-2 text-gray-600 hover:text-pink-600 transition-colors duration-200 group"
+                  title="Pronounce word"
+                  disabled={speaking}
+                >
+                  <SpeakerIcon speaking={speaking} />
+                </button>
+              )}
+              
               <div className="text-gray-500 text-sm mt-2">
                 click the word to copy it
               </div>
