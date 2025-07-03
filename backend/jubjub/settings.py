@@ -155,3 +155,8 @@ REST_FRAMEWORK = {
 # Audio settings
 AUDIO_CACHE_TIMEOUT = 3600  # 1 hour cache for audio files
 MAX_AUDIO_FILES = 1000      # Cleanup old files when limit reached
+
+
+CORS_ALLOW_CREDENTIALS = True
+SESSION_COOKIE_SAMESITE = 'Lax'  # or 'None' for cross-site
+SESSION_COOKIE_HTTPONLY = True

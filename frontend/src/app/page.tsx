@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { wordGeneratorApi } from '@/services/api';
-import { GenerateWordsRequest } from '@/types';
+import { GenerateWordsRequest, Definition, CommunityData } from '@/types';
 
 import BirdIcon from '@/assets/puffin.svg';
 
@@ -115,6 +115,137 @@ const SpeakerIcon = ({ speaking }: { speaking: boolean }) => {
   );
 };
 
+// Definition Modal Component
+const DefinitionModal = ({ 
+  isOpen, 
+  onClose, 
+  word, 
+  onSubmit 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  word: string; 
+  onSubmit: (definition: string) => void;
+}) => {
+  const [definition, setDefinition] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  
+  if (!isOpen) return null;
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!definition.trim()) return;
+    
+    setSubmitting(true);
+    await onSubmit(definition);
+    setDefinition('');
+    setSubmitting(false);
+    onClose();
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 className="text-2xl font-bold mb-2">{word}</h3>
+        <p className="text-gray-600 mb-4">Add your definition for this JubJub word</p>
+        
+        <form onSubmit={handleSubmit}>
+          <textarea
+            value={definition}
+            onChange={(e) => setDefinition(e.target.value)}
+            placeholder="Enter your creative definition..."
+            className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
+            rows={4}
+            maxLength={500}
+            autoFocus
+          />
+          
+          <div className="flex justify-between items-center mt-4">
+            <span className="text-sm text-gray-500">
+              {definition.length}/500
+            </span>
+            
+            <div className="space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!definition.trim() || submitting}
+                className="px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 disabled:bg-gray-300 transition-colors"
+              >
+                {submitting ? 'Adding...' : 'Add Definition'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Definition Display Component
+const DefinitionDisplay = ({ 
+  definitions, 
+  onVote 
+}: { 
+  definitions: Definition[]; 
+  onVote: (definitionId: number, voteType: 'up' | 'down') => void;
+}) => {
+  if (!definitions || definitions.length === 0) return null;
+  
+  return (
+    <div className="mt-8 max-w-2xl mx-auto">
+      <h3 className="text-xl font-bold mb-4 text-gray-800">Community Definitions</h3>
+      <div className="space-y-4">
+        {definitions.map((def, index) => (
+          <div key={def.id} className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 text-left">
+                <span className="text-sm text-gray-500 mr-2">{index + 1}.</span>
+                <span className="text-gray-800">{def.definition}</span>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => onVote(def.id, 'up')}
+                    className="text-gray-500 hover:text-green-600 transition-colors"
+                    title="Upvote"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  <span className="text-sm font-medium text-gray-600 min-w-[2ch] text-center">
+                    {def.upvotes - def.downvotes}
+                  </span>
+                  <button
+                    onClick={() => onVote(def.id, 'down')}
+                    className="text-gray-500 hover:text-red-600 transition-colors"
+                    title="Downvote"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {new Date(def.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function Home() {
   const [words, setWords] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,6 +254,9 @@ export default function Home() {
   const [hasClickedBird, setHasClickedBird] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showDefinitionModal, setShowDefinitionModal] = useState(false);
+  const [isCommunityWord, setIsCommunityWord] = useState(false);
+  const [communityData, setCommunityData] = useState<CommunityData | null>(null);
   
   // Speech synthesis
   const { speak, stop, speaking, supported: speechSupported } = useSpeechSynthesis();
@@ -149,6 +283,8 @@ export default function Home() {
     
     setLoading(true);
     setError(null);
+    setCommunityData(null);
+    setIsCommunityWord(false);
     
     // Trigger shake animation
     setShake(true);
@@ -170,6 +306,12 @@ export default function Home() {
       
       const response = await wordGeneratorApi.generateWords(params);
       setWords(response.words);
+      
+      // Check if it's a community word
+      if (response.is_community && response.community_data) {
+        setIsCommunityWord(true);
+        setCommunityData(response.community_data);
+      }
     } catch (err) {
       setError('Failed to generate words. Please try again.');
       console.error('Error generating words:', err);
@@ -183,6 +325,10 @@ export default function Home() {
       try {
         await navigator.clipboard.writeText(words[0]);
         setCopied(true);
+        
+        // Track the copy
+        wordGeneratorApi.trackCopy(words[0]).catch(console.error);
+        
         // reset after 2 seconds
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
@@ -194,6 +340,52 @@ export default function Home() {
   const handleSpeak = () => {
     if (words.length > 0 && speechSupported) {
       speak(words[0]);
+    }
+  };
+  
+  const handleAddDefinition = async (definition: string) => {
+    if (words.length === 0) return;
+    
+    try {
+      const result = await wordGeneratorApi.addDefinition(words[0], definition);
+      
+      // Update community data if we have it
+      if (communityData) {
+        setCommunityData({
+          ...communityData,
+          definitions: [result.definition, ...communityData.definitions]
+        });
+      } else {
+        // Convert to community word
+        setIsCommunityWord(true);
+        setCommunityData({
+          word_id: 0, // We don't have this from the API yet
+          copy_count: 0,
+          definitions: [result.definition]
+        });
+      }
+    } catch (err) {
+      console.error('Failed to add definition:', err);
+    }
+  };
+  
+  const handleVote = async (definitionId: number, voteType: 'up' | 'down') => {
+    try {
+      const result = await wordGeneratorApi.voteDefinition(definitionId, voteType);
+      
+      // Update local state
+      if (communityData) {
+        setCommunityData({
+          ...communityData,
+          definitions: communityData.definitions.map(def => 
+            def.id === definitionId 
+              ? { ...def, upvotes: result.upvotes, downvotes: result.downvotes }
+              : def
+          )
+        });
+      }
+    } catch (err) {
+      console.error('Failed to vote:', err);
     }
   };
 
@@ -423,21 +615,53 @@ export default function Home() {
                 {getSyllableBreaks(words[0])}
               </div>
               
-              {/* Pronunciation button */}
-              {speechSupported && (
-                <button
-                  onClick={handleSpeak}
-                  className="mt-4 p-2 text-gray-600 hover:text-pink-600 transition-colors duration-200 group"
-                  title="Pronounce word"
-                  disabled={speaking}
-                >
-                  <SpeakerIcon speaking={speaking} />
-                </button>
+              {/* Community word badge */}
+              {isCommunityWord && (
+                <div className="inline-flex items-center px-3 py-1 bg-pink-100 text-pink-800 text-sm rounded-full mt-3 mb-2">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Community Favorite
+                </div>
               )}
+              
+              {/* Action buttons */}
+              <div className="flex justify-center items-center space-x-4 mt-4">
+                {/* Pronunciation button */}
+                {speechSupported && (
+                  <button
+                    onClick={handleSpeak}
+                    className="p-2 text-gray-600 hover:text-pink-600 transition-colors duration-200 group"
+                    title="Pronounce word"
+                    disabled={speaking}
+                  >
+                    <SpeakerIcon speaking={speaking} />
+                  </button>
+                )}
+                
+                {/* Add definition button */}
+                <button
+                  onClick={() => setShowDefinitionModal(true)}
+                  className="p-2 text-gray-600 hover:text-pink-600 transition-colors duration-200"
+                  title="Add definition"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
+              </div>
               
               <div className="text-gray-500 text-sm mt-2">
                 click the word to copy it
               </div>
+              
+              {/* Community definitions */}
+              {communityData && communityData.definitions.length > 0 && (
+                <DefinitionDisplay 
+                  definitions={communityData.definitions}
+                  onVote={handleVote}
+                />
+              )}
             </div>
           )}
         </div>
@@ -461,6 +685,14 @@ export default function Home() {
           </nav>
         </div>
       </footer>
+      
+      {/* Definition Modal */}
+      <DefinitionModal 
+        isOpen={showDefinitionModal}
+        onClose={() => setShowDefinitionModal(false)}
+        word={words[0] || ''}
+        onSubmit={handleAddDefinition}
+      />
     </div>
   );
 }
