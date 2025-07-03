@@ -55,49 +55,112 @@ def generate_words(request):
         n = max(1, min(int(n), 4))
         syllable_awareness = max(0.0, min(float(syllable_awareness), 1.0))
 
-        # 50/50 chance to show community word vs generate new
-        use_community = random.random() < 0.5
+        # 20/80 chance to show community word vs generate new
+        use_community = random.random() < 0.2  # Changed from 0.5 to 0.2
         
-        if use_community and not seed:  # Don't use community words if user provided seed
-            # Try to get a popular community word, excluding the last shown word
-            query = JubJubWord.objects.filter(copy_count__gt=0)
-            if last_word:
-                query = query.exclude(word=last_word)
+        # Max attempts to avoid infinite loops
+        max_generation_attempts = 20
+        generation_attempts = 0
+        
+        while generation_attempts < max_generation_attempts:
+            generation_attempts += 1
             
-            community_word = query.order_by('-copy_count', '-definition_count', '?').first()
+            if use_community and not seed:  # Don't use community words if user provided seed
+                # Try to get a popular community word, excluding the last shown word
+                query = JubJubWord.objects.filter(copy_count__gt=0)
+                if last_word:
+                    query = query.exclude(word=last_word)
+                
+                # Get multiple candidates to avoid picking the same one
+                community_words = list(query.order_by('-copy_count', '-definition_count')[:10])
+                if community_words:
+                    # Randomly pick from top community words
+                    community_word = random.choice(community_words)
+                    
+                    # Double-check it's not the last word
+                    if community_word.word != last_word:
+                        # Track that we showed this word
+                        WordInteraction.objects.create(
+                            word=community_word,
+                            session_id=session_id,
+                            interaction_type='shown'
+                        )
+                        
+                        # Update last shown time
+                        community_word.last_shown = timezone.now()
+                        community_word.save(update_fields=['last_shown'])
+                        
+                        # Store this word as the last shown
+                        request.session['last_word'] = community_word.word
+                        
+                        # Get definitions
+                        definitions = community_word.definitions.all()[:5]  # Top 5 definitions
+                        
+                        return Response({
+                            'words': [community_word.word],
+                            'is_community': True,
+                            'community_data': {
+                                'word_id': community_word.id,
+                                'copy_count': community_word.copy_count,
+                                'definitions': [{
+                                    'id': d.id,
+                                    'definition': d.definition,
+                                    'upvotes': d.upvotes,
+                                    'downvotes': d.downvotes,
+                                    'created_at': d.created_at.isoformat(),
+                                } for d in definitions]
+                            },
+                            'parameters': {
+                                'count': count,
+                                'length': length,
+                                'min_length': min_length,
+                                'seed': seed,
+                                'temperature': temperature,
+                                'n': n,
+                                'use_word_boundaries': use_word_boundaries,
+                                'syllable_awareness': syllable_awareness
+                            }
+                        })
+                
+                # If we couldn't find a different community word, fall through to generation
+                use_community = False
+
+            # Generate new word(s)
+            markov = get_markov_instance(n=n, use_word_boundaries=use_word_boundaries)
+
+            word = markov.genny(
+                max_length=length, 
+                min_length=min_length,
+                seed=seed, 
+                temperature=temperature,
+                syllable_awareness=syllable_awareness
+            )
             
-            if community_word:
-                # Track that we showed this word
-                WordInteraction.objects.create(
-                    word=community_word,
-                    session_id=session_id,
-                    interaction_type='shown'
+            # Check if it's different from the last word
+            if word != last_word or generation_attempts >= max_generation_attempts - 1:
+                # Store the generated word
+                jubjub_word, created = JubJubWord.objects.get_or_create(
+                    word=word,
+                    defaults={
+                        'temperature': temperature,
+                        'markov_order': n,
+                        'syllable_awareness': syllable_awareness,
+                    }
                 )
                 
-                # Update last shown time
-                community_word.last_shown = timezone.now()
-                community_word.save(update_fields=['last_shown'])
+                # Track generation
+                WordInteraction.objects.create(
+                    word=jubjub_word,
+                    session_id=session_id,
+                    interaction_type='generate'
+                )
                 
                 # Store this word as the last shown
-                request.session['last_word'] = community_word.word
-                
-                # Get definitions
-                definitions = community_word.definitions.all()[:5]  # Top 5 definitions
-                
+                request.session['last_word'] = word
+
                 return Response({
-                    'words': [community_word.word],
-                    'is_community': True,
-                    'community_data': {
-                        'word_id': community_word.id,
-                        'copy_count': community_word.copy_count,
-                        'definitions': [{
-                            'id': d.id,
-                            'definition': d.definition,
-                            'upvotes': d.upvotes,
-                            'downvotes': d.downvotes,
-                            'created_at': d.created_at.isoformat(),
-                        } for d in definitions]
-                    },
+                    'words': [word],
+                    'is_community': False,
                     'parameters': {
                         'count': count,
                         'length': length,
@@ -109,53 +172,14 @@ def generate_words(request):
                         'syllable_awareness': syllable_awareness
                     }
                 })
-
-        # Generate new word(s)
-        markov = get_markov_instance(n=n, use_word_boundaries=use_word_boundaries)
-
-        words = []
-        attempts = 0
-        max_attempts = 10
+            
+            # If we got a duplicate, try again
+            # For community words, disable community selection for this attempt
+            use_community = False
         
-        while len(words) < count and attempts < max_attempts:
-            attempts += 1
-            
-            word = markov.genny(
-                max_length=length, 
-                min_length=min_length,
-                seed=seed, 
-                temperature=temperature,
-                syllable_awareness=syllable_awareness
-            )
-            
-            # Skip if it's the same as the last word
-            if word == last_word and attempts < max_attempts:
-                continue
-                
-            words.append(word)
-            
-            # Store the generated word
-            jubjub_word, created = JubJubWord.objects.get_or_create(
-                word=word,
-                defaults={
-                    'temperature': temperature,
-                    'markov_order': n,
-                    'syllable_awareness': syllable_awareness,
-                }
-            )
-            
-            # Track generation
-            WordInteraction.objects.create(
-                word=jubjub_word,
-                session_id=session_id,
-                interaction_type='generate'
-            )
-            
-            # Store this word as the last shown
-            request.session['last_word'] = word
-
+        # Fallback (should rarely reach here)
         return Response({
-            'words': words,
+            'words': ['jubjub'],  # Default fallback word
             'is_community': False,
             'parameters': {
                 'count': count,
