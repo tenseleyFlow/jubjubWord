@@ -11,7 +11,6 @@ function getSyllableBreaks(word: string): string {
   const vowels = 'aeiouAEIOU';
   const syllables: string[] = [];
   let currentSyllable = '';
-  let previousWasVowel = false;
   
   for (let i = 0; i < word.length; i++) {
     const char = word[i];
@@ -37,13 +36,10 @@ function getSyllableBreaks(word: string): string {
       
       syllables.push(currentSyllable);
       currentSyllable = '';
-      previousWasVowel = false;
     } else if (i === word.length - 1) {
       // Add remaining
       syllables.push(currentSyllable);
     }
-    
-    previousWasVowel = isVowel;
   }
   
   // Handle any remaining characters
