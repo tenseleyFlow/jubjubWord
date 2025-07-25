@@ -3,6 +3,8 @@
 import os
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db import connection
+from django.db.utils import OperationalError
 from jubjub.jubjubword.models import Corpus
 
 
@@ -10,6 +12,19 @@ class Command(BaseCommand):
     help = 'Load corpus metadata into the database (actual words stay in files)'
 
     def handle(self, *args, **options):
+        # Check if the Corpus table exists
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM jubjubword_corpus LIMIT 1")
+        except OperationalError:
+            self.stdout.write(
+                self.style.ERROR(
+                    '❌ The Corpus table does not exist yet. '
+                    'Please run migrations first: python manage.py migrate'
+                )
+            )
+            return
+        
         # Define corpus metadata
         corpora_data = [
             {
@@ -85,23 +100,28 @@ class Command(BaseCommand):
                 )
                 continue
             
-            corpus, created = Corpus.objects.update_or_create(
-                slug=corpus_data['slug'],
-                defaults=corpus_data
-            )
-            
-            # Update word count from file
-            word_count = corpus.update_word_count()
-            
-            if created:
-                created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f'✅ Created corpus: {corpus.name} ({word_count} words from {corpus.filename})')
+            try:
+                corpus, created = Corpus.objects.update_or_create(
+                    slug=corpus_data['slug'],
+                    defaults=corpus_data
                 )
-            else:
-                updated_count += 1
+                
+                # Update word count from file
+                word_count = corpus.update_word_count()
+                
+                if created:
+                    created_count += 1
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✅ Created corpus: {corpus.name} ({word_count} words from {corpus.filename})')
+                    )
+                else:
+                    updated_count += 1
+                    self.stdout.write(
+                        self.style.SUCCESS(f'📝 Updated corpus: {corpus.name} ({word_count} words from {corpus.filename})')
+                    )
+            except Exception as e:
                 self.stdout.write(
-                    self.style.SUCCESS(f'📝 Updated corpus: {corpus.name} ({word_count} words from {corpus.filename})')
+                    self.style.ERROR(f'❌ Error processing {corpus_data["name"]}: {str(e)}')
                 )
         
         self.stdout.write(
