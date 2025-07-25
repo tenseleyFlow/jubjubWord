@@ -23,6 +23,16 @@ export interface CommunityData {
   definitions: Definition[];
 }
 
+export interface Corpus {
+  slug: string;
+  name: string;
+  description: string;
+  theme_color: string;
+  icon_emoji: string;
+  word_count: number;
+  times_used: number;
+}
+
 export interface GenerateWordsResponse {
   words: string[];
   is_community?: boolean;
@@ -36,5 +46,6 @@ export interface GenerateWordsResponse {
     n: number;
     use_word_boundaries: boolean;
     syllable_awareness: number;
+    corpus?: string;
   };
 }

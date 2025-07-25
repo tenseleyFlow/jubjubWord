@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { wordGeneratorApi } from '@/services/api';
-import { GenerateWordsRequest, Definition, CommunityData } from '@/types';
+import { GenerateWordsRequest, Definition, CommunityData, Corpus } from '@/types';
 
 import BirdIcon from '@/assets/puffin.svg';
 
@@ -246,6 +246,28 @@ const DefinitionDisplay = ({
   );
 };
 
+// Corpus Radio Button Component
+const CorpusRadioButton = ({ corpus, isSelected, onChange }: {
+  corpus: Corpus;
+  isSelected: boolean;
+  onChange: () => void;
+}) => (
+  <label className="corpus-radio-label">
+    <input
+      type="radio"
+      name="corpus"
+      value={corpus.slug}
+      checked={isSelected}
+      onChange={onChange}
+      className="corpus-radio-input"
+    />
+    <span className="corpus-radio-button">
+      <span className="corpus-radio-emoji">{corpus.icon_emoji}</span>
+      <span className="corpus-radio-name">{corpus.name}</span>
+    </span>
+  </label>
+);
+
 export default function Home() {
   const [words, setWords] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -257,6 +279,11 @@ export default function Home() {
   const [showDefinitionModal, setShowDefinitionModal] = useState(false);
   const [isCommunityWord, setIsCommunityWord] = useState(false);
   const [communityData, setCommunityData] = useState<CommunityData | null>(null);
+  
+  // Corpus state
+  const [selectedCorpus, setSelectedCorpus] = useState('classic');
+  const [corpora, setCorpora] = useState<Corpus[]>([]);
+  const [loadingCorpora, setLoadingCorpora] = useState(true);
   
   // Speech synthesis
   const { speak, stop, speaking, supported: speechSupported } = useSpeechSynthesis();
@@ -270,6 +297,32 @@ export default function Home() {
   const [markovOrder, setMarkovOrder] = useState(2);
   const [useWordBoundaries, setUseWordBoundaries] = useState(true);
   const [syllableAwareness, setSyllableAwareness] = useState(0.0);
+
+  // Load corpora on mount
+  useEffect(() => {
+    const loadCorpora = async () => {
+      try {
+        const response = await wordGeneratorApi.getCorpora();
+        setCorpora(response.corpora);
+      } catch (error) {
+        console.error('Failed to load corpora:', error);
+        // Fallback to at least classic if API fails
+        setCorpora([{
+          slug: 'classic',
+          name: 'Classic JubJub',
+          description: 'The original JubJub corpus',
+          theme_color: '#3A2449',
+          icon_emoji: '🦜',
+          word_count: 0,
+          times_used: 0
+        }]);
+      } finally {
+        setLoadingCorpora(false);
+      }
+    };
+    
+    loadCorpora();
+  }, []);
 
   const handleGenerate = async () => {
     // block multiple clicks during loading
@@ -301,6 +354,7 @@ export default function Home() {
         n: markovOrder,
         use_word_boundaries: useWordBoundaries,
         syllable_awareness: syllableAwareness,
+        corpus: selectedCorpus,  // Include selected corpus
         ...(seed && { seed }),
       };
       
@@ -490,6 +544,45 @@ export default function Home() {
                 />
               </div>
             </div>
+
+            {/* Corpus Selector */}
+            {!loadingCorpora && corpora.length > 0 && (
+              <>
+                {/* Desktop Radio Buttons */}
+                <div className="hidden md:flex corpus-selector-desktop">
+                  <div className="corpus-radio-group">
+                    {corpora.map((corpus) => (
+                      <CorpusRadioButton
+                        key={corpus.slug}
+                        corpus={corpus}
+                        isSelected={selectedCorpus === corpus.slug}
+                        onChange={() => setSelectedCorpus(corpus.slug)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mobile Select Dropdown */}
+                <div className="md:hidden corpus-selector-mobile">
+                  <select
+                    value={selectedCorpus}
+                    onChange={(e) => setSelectedCorpus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white"
+                  >
+                    {corpora.map((corpus) => (
+                      <option key={corpus.slug} value={corpus.slug}>
+                        {corpus.icon_emoji} {corpus.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCorpus && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {corpora.find(c => c.slug === selectedCorpus)?.description}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* advanced options toggle */}
             <div className="mb-4">
