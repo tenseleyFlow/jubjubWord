@@ -7,6 +7,7 @@ export interface GenerateWordsRequest {
   n?: number;
   use_word_boundaries?: boolean;
   syllable_awareness?: number;
+  corpus?: string;
 }
 
 export interface Definition {
@@ -21,6 +22,16 @@ export interface CommunityData {
   word_id: number;
   copy_count: number;
   definitions: Definition[];
+}
+
+export interface Corpus {
+  slug: string;
+  name: string;
+  description: string;
+  theme_color: string;
+  icon_emoji: string;
+  word_count: number;
+  times_used: number;
 }
 
 export interface GenerateWordsResponse {

@@ -152,11 +152,133 @@ body {
   text-shadow: 0 0 10px rgba(236, 72, 153, 0.3);
 }
 
-
 .bg-rose-to-cream {
   background: linear-gradient(
     136deg,
     var(--color-sub) 0%,
     var(--color-bg) 60%
   );
+}
+
+/* Corpus Radio Button Styles */
+.corpus-selector-desktop {
+  justify-content: center;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.corpus-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(58, 36, 73, 0.05);
+  border-radius: 2rem;
+  border: 1px solid rgba(58, 36, 73, 0.1);
+  max-width: 100%;
+}
+
+.corpus-radio-label {
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.corpus-radio-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.corpus-radio-button {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 1.75rem;
+  border: 2px solid transparent;
+  background: white;
+  transition: all 0.2s ease;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+.corpus-radio-emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.corpus-radio-name {
+  white-space: nowrap;
+}
+
+/* Hover state */
+.corpus-radio-label:hover .corpus-radio-button {
+  border-color: rgba(244, 114, 182, 0.3);
+  box-shadow: 0 2px 8px rgba(244, 114, 182, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Selected state */
+.corpus-radio-input:checked + .corpus-radio-button {
+  background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%);
+  color: white;
+  border-color: #ec4899;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.35);
+}
+
+/* Focus state for accessibility */
+.corpus-radio-input:focus-visible + .corpus-radio-button {
+  outline: 2px solid #f472b6;
+  outline-offset: 2px;
+}
+
+/* Mobile selector */
+.corpus-selector-mobile {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .corpus-radio-group {
+    gap: 0.875rem;
+    padding: 0.625rem;
+  }
+  
+  .corpus-radio-button {
+    padding: 0.625rem 1.125rem;
+    font-size: 0.875rem;
+  }
+  
+  .corpus-radio-emoji {
+    font-size: 1.125rem;
+  }
+}
+
+/* Tablet screens */
+@media (max-width: 768px) {
+  .corpus-radio-group {
+    gap: 0.75rem;
+    padding: 0.5rem;
+  }
+  
+  .corpus-radio-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .corpus-radio-emoji {
+    font-size: 1rem;
+  }
+}
+
+/* Small mobile screens - switch to select dropdown via md:hidden */
+@media (max-width: 639px) {
+  /* The mobile select is shown via md:hidden class in the component */
 }

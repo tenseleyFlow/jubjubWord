@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { GenerateWordsRequest, GenerateWordsResponse } from '@/types';
+import { GenerateWordsRequest, GenerateWordsResponse, Corpus } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -68,4 +68,9 @@ export const wordGeneratorApi = {
     const response = await api.get(`/word/${encodeURIComponent(word)}/definitions/`);
     return response.data;
   },
+
+  getCorpora: async (): Promise<{ corpora: Corpus[] }> => {
+    const response = await api.get('/corpora/');
+    return response.data;
+},
 };
