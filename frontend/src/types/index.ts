@@ -7,6 +7,7 @@ export interface GenerateWordsRequest {
   n?: number;
   use_word_boundaries?: boolean;
   syllable_awareness?: number;
+  corpus?: string;
 }
 
 export interface Definition {
@@ -46,6 +47,5 @@ export interface GenerateWordsResponse {
     n: number;
     use_word_boundaries: boolean;
     syllable_awareness: number;
-    corpus?: string;
   };
 }
