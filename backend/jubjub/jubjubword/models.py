@@ -3,6 +3,62 @@ from django.utils import timezone
 import uuid
 
 
+class Corpus(models.Model):
+    """Corpus metadata - actual words are stored in files"""
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(unique=True)
+    description = models.TextField()
+    
+    # Theme metadata
+    theme_color = models.CharField(max_length=7, default='#3A2449')  # Hex color
+    icon_emoji = models.CharField(max_length=10, default='🦜')
+    
+    # File reference (e.g., "scifi.txt")
+    filename = models.CharField(max_length=100,
+        default="corpus.txt",
+        help_text="Filename in jubjubword directory"
+    )
+    
+    # Stats
+    word_count = models.IntegerField(default=0)
+    times_used = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    # Feature flags
+    is_active = models.BooleanField(default=True)
+    is_premium = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = "Corpora"
+    
+    def get_file_path(self):
+        """Get the full path to the corpus file"""
+        from django.conf import settings
+        import os
+        return os.path.join(settings.BASE_DIR, 'jubjub', 'jubjubword', self.filename)
+    
+    def get_words_list(self):
+        """Load words from the file"""
+        try:
+            with open(self.get_file_path(), 'r', encoding='utf-8') as f:
+                return [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            logger.error(f"Corpus file not found: {self.filename}")
+            return []
+    
+    def update_word_count(self):
+        """Update the word count from the file"""
+        words = self.get_words_list()
+        self.word_count = len(words)
+        self.save(update_fields=['word_count'])
+        return self.word_count
+    
+    def __str__(self):
+        return self.name
+    
+
 class JubJubWord(models.Model):
     """A word that has been generated and potentially defined by the community"""
     word = models.CharField(max_length=50, unique=True, db_index=True)
@@ -20,6 +76,14 @@ class JubJubWord(models.Model):
     # Timestamps
     first_generated = models.DateTimeField(default=timezone.now)
     last_shown = models.DateTimeField(null=True, blank=True)
+
+    corpus = models.ForeignKey(
+        Corpus, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='generated_words'
+    )
     
     class Meta:
         ordering = ['-copy_count', '-definition_count']

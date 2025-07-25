@@ -6,6 +6,9 @@ urlpatterns = [
     path('audio/', views.generate_audio, name='generate_audio'),
     path('health/', views.health_check, name='health_check'),
     
+    # Corpus endpoints
+    path('corpora/', views.list_corpora, name='list_corpora'),
+    
     # Community features
     path('track-copy/', views.track_copy, name='track_copy'),
     path('add-definition/', views.add_definition, name='add_definition'),

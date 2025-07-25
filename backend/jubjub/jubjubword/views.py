@@ -16,7 +16,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .markov import get_markov_instance
-from .models import JubJubWord, WordDefinition, WordInteraction
+from .models import JubJubWord, WordDefinition, WordInteraction, Corpus
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +31,26 @@ def get_or_create_session_id(request):
     return session_id
 
 
+@api_view(['GET'])
+def list_corpora(request):
+    """List all available corpora"""
+    corpora = Corpus.objects.filter(is_active=True).values(
+        'slug', 'name', 'description', 'theme_color', 
+        'icon_emoji', 'word_count', 'times_used'
+    )
+    return Response({'corpora': list(corpora)})
+
+
 @api_view(['POST'])
 def generate_words(request):
-    """API endpoint to generate nonsense words with community features"""
+    """API endpoint to generate nonsense words with corpus selection"""
     try:
         session_id = get_or_create_session_id(request)
         
         # Get the last shown word from session
         last_word = request.session.get('last_word', None)
         
-        # grab parameters from request
+        # Grab parameters from request
         count = request.data.get('count', 1)
         length = request.data.get('length', 8)
         min_length = request.data.get('min_length', 3)
@@ -49,6 +59,7 @@ def generate_words(request):
         n = request.data.get('n', 2)
         use_word_boundaries = request.data.get('use_word_boundaries', True)
         syllable_awareness = request.data.get('syllable_awareness', 0.0)
+        corpus_slug = request.data.get('corpus', 'classic')  # NEW PARAMETER
 
         # Validate parameters
         count = max(1, min(int(count), 50))
@@ -58,12 +69,26 @@ def generate_words(request):
         n = max(1, min(int(n), 4))
         syllable_awareness = max(0.0, min(float(syllable_awareness), 1.0))
 
-        # 35/65 chance to show community word vs generate new
-        use_community = random.random() < 0.35  # Changed from 0.2 to 0.35
+        # Get corpus info
+        corpus = None
+        try:
+            corpus = Corpus.objects.get(slug=corpus_slug, is_active=True)
+            # Increment usage counter
+            corpus.times_used = F('times_used') + 1
+            corpus.save(update_fields=['times_used'])
+        except Corpus.DoesNotExist:
+            corpus_slug = 'classic'  # Fallback
+            logger.warning(f"Corpus '{corpus_slug}' not found, falling back to classic")
+
+        # Community word logic (only for classic corpus)
+        use_community = corpus_slug == 'classic' and random.random() < 0.35 and not seed
         
         # Debug logging
         if use_community:
-            total_community_words = JubJubWord.objects.filter(copy_count__gt=0).count()
+            total_community_words = JubJubWord.objects.filter(
+                copy_count__gt=0,
+                corpus__slug='classic'
+            ).count()
             logger.info(f"Attempting community word selection. Total available: {total_community_words}")
         
         # Max attempts to avoid infinite loops
@@ -73,12 +98,23 @@ def generate_words(request):
         while generation_attempts < max_generation_attempts:
             generation_attempts += 1
             
-            if use_community and not seed:  # Don't use community words if user provided seed
-                # Try to get a popular community word, excluding the last shown word
-                # Include words with definitions OR copies
+            if use_community:
+                # Try to get a popular community word from classic corpus
                 query = JubJubWord.objects.filter(
                     Q(copy_count__gt=0) | Q(definition_count__gt=0)
                 )
+                
+                # Filter by corpus if we have one
+                if corpus:
+                    query = query.filter(corpus=corpus)
+                else:
+                    # Try to get classic corpus
+                    try:
+                        classic_corpus = Corpus.objects.get(slug='classic')
+                        query = query.filter(corpus=classic_corpus)
+                    except Corpus.DoesNotExist:
+                        pass
+                
                 if last_word:
                     query = query.exclude(word=last_word)
                 
@@ -110,6 +146,7 @@ def generate_words(request):
                         return Response({
                             'words': [community_word.word],
                             'is_community': True,
+                            'corpus': corpus_slug,
                             'community_data': {
                                 'word_id': community_word.id,
                                 'copy_count': community_word.copy_count,
@@ -129,15 +166,20 @@ def generate_words(request):
                                 'temperature': temperature,
                                 'n': n,
                                 'use_word_boundaries': use_word_boundaries,
-                                'syllable_awareness': syllable_awareness
+                                'syllable_awareness': syllable_awareness,
+                                'corpus': corpus_slug
                             }
                         })
                 
                 # If we couldn't find a different community word, fall through to generation
                 use_community = False
 
-            # Generate new word(s)
-            markov = get_markov_instance(n=n, use_word_boundaries=use_word_boundaries)
+            # Generate new word with selected corpus
+            markov = get_markov_instance(
+                n=n, 
+                use_word_boundaries=use_word_boundaries,
+                corpus_slug=corpus_slug
+            )
 
             word = markov.genny(
                 max_length=length, 
@@ -156,6 +198,7 @@ def generate_words(request):
                         'temperature': temperature,
                         'markov_order': n,
                         'syllable_awareness': syllable_awareness,
+                        'corpus': corpus,  # Associate with corpus
                     }
                 )
                 
@@ -172,6 +215,7 @@ def generate_words(request):
                 return Response({
                     'words': [word],
                     'is_community': False,
+                    'corpus': corpus_slug,
                     'parameters': {
                         'count': count,
                         'length': length,
@@ -180,7 +224,8 @@ def generate_words(request):
                         'temperature': temperature,
                         'n': n,
                         'use_word_boundaries': use_word_boundaries,
-                        'syllable_awareness': syllable_awareness
+                        'syllable_awareness': syllable_awareness,
+                        'corpus': corpus_slug
                     }
                 })
             
@@ -192,6 +237,7 @@ def generate_words(request):
         return Response({
             'words': ['jubjub'],  # Default fallback word
             'is_community': False,
+            'corpus': corpus_slug,
             'parameters': {
                 'count': count,
                 'length': length,
@@ -200,11 +246,13 @@ def generate_words(request):
                 'temperature': temperature,
                 'n': n,
                 'use_word_boundaries': use_word_boundaries,
-                'syllable_awareness': syllable_awareness
+                'syllable_awareness': syllable_awareness,
+                'corpus': corpus_slug
             }
         })
 
     except Exception as e:
+        logger.error(f"Error generating words: {str(e)}", exc_info=True)
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -385,7 +433,64 @@ def get_word_definitions(request, word):
 @api_view(['POST'])
 def generate_audio(request):
     """Generate audio pronunciation for a word using espeak-ng"""
-    # ... existing code ...
+    try:
+        word = request.data.get('word', '').strip()
+        if not word:
+            return Response({'error': 'No word provided'}, status=400)
+        
+        # Sanitize word for filename
+        safe_word = "".join(c for c in word if c.isalnum() or c in '-_').lower()
+        if not safe_word:
+            safe_word = hashlib.md5(word.encode()).hexdigest()[:10]
+        
+        # Create media directory if it doesn't exist
+        media_dir = Path(settings.MEDIA_ROOT) / 'audio'
+        media_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        filename = f"{safe_word}_{hashlib.md5(word.encode()).hexdigest()[:8]}.wav"
+        filepath = media_dir / filename
+        
+        # Check if file already exists
+        if filepath.exists():
+            return FileResponse(
+                open(filepath, 'rb'),
+                content_type='audio/wav',
+                as_attachment=False
+            )
+        
+        # Generate audio using espeak-ng
+        try:
+            result = subprocess.run(
+                ['espeak-ng', '-w', str(filepath), word],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"espeak-ng error: {e.stderr}")
+            return Response({'error': 'Audio generation failed'}, status=500)
+        except FileNotFoundError:
+            logger.error("espeak-ng not found")
+            return Response({'error': 'Audio generation not available'}, status=503)
+        
+        # Clean up old files if needed
+        audio_files = list(media_dir.glob('*.wav'))
+        if len(audio_files) > settings.MAX_AUDIO_FILES:
+            # Remove oldest files
+            audio_files.sort(key=lambda x: x.stat().st_mtime)
+            for old_file in audio_files[:len(audio_files) - settings.MAX_AUDIO_FILES]:
+                old_file.unlink()
+        
+        return FileResponse(
+            open(filepath, 'rb'),
+            content_type='audio/wav',
+            as_attachment=False
+        )
+    
+    except Exception as e:
+        logger.error(f"Error generating audio: {str(e)}")
+        return Response({'error': str(e)}, status=500)
 
 
 @api_view(['GET'])

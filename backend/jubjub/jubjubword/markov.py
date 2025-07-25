@@ -2,6 +2,7 @@ import os
 import random
 import logging
 from django.conf import settings
+from django.core.cache import cache
 from collections import defaultdict, Counter
 from typing import List, Dict, Optional, Tuple
 
@@ -378,43 +379,108 @@ class Marklove:
         }
 
 
-# global instance management
-_markov_instances: Dict[Tuple[int, bool], Marklove] = {}
+# global instance management with corpus support
+_markov_instances: Dict[Tuple[int, bool, str], Marklove] = {}
 
 
-def get_markov_instance(n: int = 2, use_word_boundaries: bool = True) -> Marklove:
+def get_markov_instance(n: int = 2, use_word_boundaries: bool = True, 
+                       corpus_slug: str = 'classic') -> Marklove:
     """
-    grab or create a Markov instance with specified parameters.
-
+    Get or create a Markov instance with specified parameters and corpus.
+    
     Args:
         n: Order of the Markov chain
         use_word_boundaries: Whether to use word boundaries
-
+        corpus_slug: Slug of the corpus to use
+        
     Returns:
         Markov instance
     """
-    key = (n, use_word_boundaries)
-
+    key = (n, use_word_boundaries, corpus_slug)
+    
+    # Check cache first
+    cache_key = f"markov_{n}_{use_word_boundaries}_{corpus_slug}"
+    cached_instance = cache.get(cache_key)
+    if cached_instance:
+        return cached_instance
+    
     if key not in _markov_instances:
         instance = Marklove(n=n, use_word_boundaries=use_word_boundaries)
-
-        # load corpus
-        corpus_path = os.path.join(settings.BASE_DIR, 'jubjub', 'jubjubword', 'corpus.txt')
+        
+        # Load corpus from database (which points to file)
+        from jubjub.jubjubword.models import Corpus
+        
+        words = []
+        corpus_name = corpus_slug
+        
         try:
-            with open(corpus_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            logger.info(f"Loaded corpus with {len(lines)} lines")
-        except FileNotFoundError:
-            logger.warning(f"Corpus file not found at {corpus_path}, using fallback")
-            lines = ["bartledoo", "malt-lickey", "schnoodleflop", "jubjub", "galumph"]
-
-        instance.train(lines)
+            corpus = Corpus.objects.get(slug=corpus_slug, is_active=True)
+            words = corpus.get_words_list()
+            corpus_name = corpus.name
+            
+            if not words:
+                raise ValueError(f"No words found in corpus file: {corpus.filename}")
+                
+            logger.info(f"Loaded corpus '{corpus_name}' from {corpus.filename} with {len(words)} words")
+            
+        except Corpus.DoesNotExist:
+            # Fallback: try to load the file directly
+            logger.warning(f"Corpus '{corpus_slug}' not in database, trying direct file load")
+            
+            # Map of slug to filename for backwards compatibility
+            slug_to_file = {
+                'classic': 'corpus.txt',
+                'scifi': 'scifi.txt',
+                'fantasy': 'fantasy.txt',
+                'food': 'food.txt',
+                'corporate': 'corporate.txt',
+                'medical': 'medical.txt'
+            }
+            
+            filename = slug_to_file.get(corpus_slug, f'{corpus_slug}.txt')
+            corpus_path = os.path.join(settings.BASE_DIR, 'jubjub', 'jubjubword', filename)
+            
+            try:
+                with open(corpus_path, 'r', encoding='utf-8') as f:
+                    words = [line.strip() for line in f if line.strip()]
+                logger.info(f"Loaded corpus from file {filename} with {len(words)} words")
+            except FileNotFoundError:
+                # Ultimate fallback
+                logger.error(f"Corpus file not found: {corpus_path}")
+                words = ["bartledoo", "malt-lickey", "schnoodleflop", "jubjub", "galumph"]
+                corpus_name = "Fallback"
+        
+        except Exception as e:
+            logger.error(f"Error loading corpus: {str(e)}")
+            words = ["bartledoo", "malt-lickey", "schnoodleflop", "jubjub", "galumph"]
+            corpus_name = "Fallback"
+        
+        if not words:
+            logger.error("No words available for training!")
+            words = ["error", "nowords", "available"]
+        
+        instance.train(words)
         _markov_instances[key] = instance
-
+        
+        # Cache for 1 hour
+        cache.set(cache_key, instance, 3600)
+    
     return _markov_instances[key]
 
 
-def clear_cache():
-    """Clear the cached Markov instances."""
+def clear_corpus_cache(corpus_slug: str = None):
+    """Clear cached Markov instances for a specific corpus or all"""
     global _markov_instances
-    _markov_instances.clear()
+    
+    if corpus_slug:
+        # Clear specific corpus
+        keys_to_remove = [k for k in _markov_instances.keys() if k[2] == corpus_slug]
+        for key in keys_to_remove:
+            del _markov_instances[key]
+            cache_key = f"markov_{key[0]}_{key[1]}_{key[2]}"
+            cache.delete(cache_key)
+    else:
+        # Clear all
+        _markov_instances.clear()
+        # Note: cache.delete_pattern might not be available in all cache backends
+        # For safety, we'll just let them expire naturally
