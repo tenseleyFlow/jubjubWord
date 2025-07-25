@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 'is_active': True,
             },
             {
-                'name': 'Corporate Buzzword',
+                'name': 'LinkedIn Buzzword',
                 'slug': 'corporate',
                 'description': 'Synergistic paradigm shifts for your next meeting',
                 'theme_color': '#4A5568',
