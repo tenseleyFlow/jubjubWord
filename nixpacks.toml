@@ -2,10 +2,10 @@
 nixPkgs = ["python311", "postgresql"]
 
 [phases.install]
-cmds = ["cd backend && pip install -r requirements.txt"]
+cmds = ["pip install -r requirements.txt"]
 
 [phases.build]
-cmds = ["cd backend && python manage.py collectstatic --noinput"]
+cmds = ["python manage.py collectstatic --noinput"]
 
 [start]
-cmd = "cd backend && python manage.py migrate && python manage.py load_corpora && gunicorn jubjub.wsgi:application --bind 0.0.0.0:$PORT"
+cmd = "python manage.py migrate && python manage.py load_corpora --verbosity=2 && gunicorn jubjub.wsgi:application --bind 0.0.0.0:$PORT"
