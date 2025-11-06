@@ -80,16 +80,16 @@ def generate_words(request):
             corpus_slug = 'classic'  # Fallback
             logger.warning(f"Corpus '{corpus_slug}' not found, falling back to classic")
 
-        # Community word logic (only for classic corpus)
-        use_community = corpus_slug == 'classic' and random.random() < 0.35 and not seed
+        # Community word logic (works for all corpora)
+        use_community = random.random() < 0.35 and not seed
         
         # Debug logging
         if use_community:
             total_community_words = JubJubWord.objects.filter(
                 copy_count__gt=0,
-                corpus__slug='classic'
+                corpus__slug=corpus_slug
             ).count()
-            logger.info(f"Attempting community word selection. Total available: {total_community_words}")
+            logger.info(f"Attempting community word selection from {corpus_slug}. Total available: {total_community_words}")
         
         # Max attempts to avoid infinite loops
         max_generation_attempts = 20
@@ -99,7 +99,7 @@ def generate_words(request):
             generation_attempts += 1
             
             if use_community:
-                # Try to get a popular community word from classic corpus
+                # Try to get a popular community word from selected corpus
                 query = JubJubWord.objects.filter(
                     Q(copy_count__gt=0) | Q(definition_count__gt=0)
                 )
