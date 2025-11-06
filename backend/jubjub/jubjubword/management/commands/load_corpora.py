@@ -80,6 +80,15 @@ class Command(BaseCommand):
                 'icon_emoji': '🔬',
                 'filename': 'medical.txt',
                 'is_active': True,
+            },
+            {
+                'name': 'LARGE',
+                'slug': 'large',
+                'description': 'Maximum variety - 1700+ plausibly deniable gibberish words',
+                'theme_color': '#6B46C1',
+                'icon_emoji': '🎲',
+                'filename': 'large.txt',
+                'is_active': True,
             }
         ]
         
