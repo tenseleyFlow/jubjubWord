@@ -153,6 +153,13 @@ dist
 tmp/
 temp/
 
+# Machine Learning Models
+# NOTE: We COMMIT hybrid models for fast deployment (Option A)
+# If training locally, the models in hybrid_models/ should be committed
+# Only ignore training checkpoints and temporary files
+backend/jubjub/jubjubword/hybrid_models/*/best_model.pt
+backend/jubjub/jubjubword/hybrid_models/*/training_history.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,0 +1,13 @@
+# Binary model files - do not attempt text diff
+*.pt binary
+*.pkl binary
+*.pth binary
+
+# Model metadata - text files but large
+backend/jubjub/jubjubword/hybrid_models/**/*.json text
+backend/jubjub/jubjubword/models/**/*.pkl binary
+
+# Standard Git LFS patterns (optional - not using LFS yet)
+# Uncomment these if models exceed 100MB total:
+# *.pt filter=lfs diff=lfs merge=lfs -text
+# *.pkl filter=lfs diff=lfs merge=lfs -text
