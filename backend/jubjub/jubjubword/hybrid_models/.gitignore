@@ -1,0 +1,9 @@
+# Trained hybrid models - these are generated during training
+*.pt
+*.json
+
+# Keep the directory
+!.gitignore
+
+# Note: Models are corpus-specific and should be trained per deployment
+# Training takes ~2-3 minutes on CPU per corpus

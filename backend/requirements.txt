@@ -9,3 +9,10 @@ phonemizer==3.2.1
 pydub==0.25.1
 psycopg2-binary==2.9.9
 dj-database-url==2.1.0
+
+# Hybrid Markov-LSTM Models (inference only)
+# Pre-trained models are committed to repo, so training is optional
+# For local training, see: python manage.py train_hybrid_models --help
+torch==2.4.1
+numpy==1.26.4
+tqdm==4.66.1

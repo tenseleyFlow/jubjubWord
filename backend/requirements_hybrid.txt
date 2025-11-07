@@ -1,0 +1,24 @@
+# Additional requirements for Markov-LSTM Hybrid models
+# Install with: pip install -r requirements_hybrid.txt
+
+# Core ML framework
+torch>=2.0.0,<3.0.0
+
+# Numerical operations
+numpy>=1.24.0,<2.0.0
+
+# Progress bars for training
+tqdm>=4.65.0
+
+# Already in requirements.txt but listed for completeness:
+# django>=4.2.0
+# djangorestframework>=3.14.0
+
+# Optional: CUDA support (Linux/Windows with NVIDIA GPU)
+# torch-cuda  # Uncomment if using GPU
+
+# Development/Research tools (optional)
+# jupyter>=1.0.0          # For notebooks
+# matplotlib>=3.7.0       # For visualizations
+# seaborn>=0.12.0         # For pretty plots
+# tensorboard>=2.13.0     # For training monitoring

@@ -1,0 +1,5 @@
+# Cached Markov models - these are generated on first run
+*.pkl
+
+# Keep the directory
+!.gitignore
